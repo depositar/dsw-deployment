@@ -61,8 +61,8 @@ database:
 
 # (!!) Change default credentials
 s3:
-  # Use a host-reachable endpoint so browser-facing presigned URLs work in local Docker.
-  url: http://host.docker.internal:9000
+  # Use the server IP or DNS name so both the browser and containers can reach Garage.
+  url: http://192.168.56.14:9000
   username: GK0123456789abcdef01234567
   password: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   bucket: engine-wizard

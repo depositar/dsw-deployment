@@ -8,12 +8,10 @@ services:
     ports:
       - 127.0.0.1:3000:3000
     depends_on:
-      - postgres
-      - garage
+      create-bucket:
+        condition: service_completed_successfully
     volumes:
       - ./config/application.yml:/app/config/application.yml:ro
-    extra_hosts:
-      - host.docker.internal:host-gateway
     # Keep runtime S3 values in .env so they stay aligned with Garage bootstrap.
     environment:
       S3_URL: ${S3_URL}
@@ -35,13 +33,10 @@ services:
     image: datastewardshipwizard/document-worker:${DSW_VERSION}
     restart: always
     depends_on:
-      - postgres
-      - garage
-      - server
+      create-bucket:
+        condition: service_completed_successfully
     volumes:
       - ./config/application.yml:/app/config/application.yml:ro
-    extra_hosts:
-      - host.docker.internal:host-gateway
     # Keep runtime S3 values in .env so they stay aligned with Garage bootstrap.
     environment:
       S3_URL: ${S3_URL}
@@ -71,10 +66,10 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     # Uncomment one option below to persist PostgreSQL data locally.
-    # volumes:
+    volumes:
     #   - db-data:/var/lib/postgresql/data
     # OR
-    #   - ./db-data/data:/var/lib/postgresql/data
+      - ./db-data/data:/var/lib/postgresql/data
 
   garage:
     image: dxflrs/garage:${GARAGE_VERSION}
@@ -92,7 +87,27 @@ services:
     volumes:
       - ./config/garage.toml:/etc/garage.toml:ro
       # Uncomment to persist Garage state between local restarts.
-      # - ./garage-data:/var/lib/garage
+      - ./garage-data:/var/lib/garage
+
+  create-bucket:
+    image: python:3.13-alpine
+    restart: "no"
+    depends_on:
+      garage:
+        condition: service_started
+    entrypoint: ["python3", "/script/create-bucket.py"]
+    environment:
+      GARAGE_ADMIN_URL: ${GARAGE_ADMIN_URL}
+      GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN}
+      GARAGE_ZONE: ${GARAGE_ZONE}
+      GARAGE_CAPACITY: ${GARAGE_CAPACITY}
+      GARAGE_KEY_NAME: ${GARAGE_KEY_NAME}
+      S3_URL: ${S3_URL}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_USERNAME: ${S3_USERNAME}
+      S3_PASSWORD: ${S3_PASSWORD}
+    volumes:
+      - ./script/create-bucket.py:/script/create-bucket.py:ro
 
 # volumes:
 #   db-data:
