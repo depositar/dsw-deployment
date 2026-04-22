@@ -43,9 +43,6 @@ services:
   postgres:
     image: postgres:${POSTGRES_VERSION}
     restart: always
-    # Local debug access only.
-    ports:
-      - 127.0.0.1:5432:5432
     # Change defaults before using this outside a local POC.
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -57,11 +54,9 @@ services:
   garage:
     image: dxflrs/garage:${GARAGE_VERSION}
     restart: always
-    # Publish Garage on the host so both containers and the browser can reach the same endpoint.
-    # Do not expose this directly in a public deployment.
+    # Publish only the S3 endpoint on the host so both containers and the browser can reach it.
     ports:
       - 9000:3900
-      - 9003:3903
     # Change these defaults before sharing or reusing this setup.
     environment:
       GARAGE_RPC_SECRET: ${GARAGE_RPC_SECRET}
