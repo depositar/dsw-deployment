@@ -51,11 +51,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    # Uncomment one option below to persist PostgreSQL data locally.
     volumes:
-    #   - db-data:/var/lib/postgresql/data
-    # OR
-      - ./db-data/data:/var/lib/postgresql/data
+      - db-data:/var/lib/postgresql/data
 
   garage:
     image: dxflrs/garage:${GARAGE_VERSION}
@@ -72,8 +69,7 @@ services:
       GARAGE_METRICS_TOKEN: ${GARAGE_METRICS_TOKEN}
     volumes:
       - ./config/garage.toml:/etc/garage.toml:ro
-      # Uncomment to persist Garage state between local restarts.
-      - ./garage-data:/var/lib/garage
+      - garage-data:/var/lib/garage
 
   create-bucket:
     image: python:3.13-alpine
@@ -95,5 +91,6 @@ services:
     volumes:
       - ./script/create-bucket.py:/script/create-bucket.py:ro
 
-# volumes:
-#   db-data:
+volumes:
+  db-data:
+  garage-data:

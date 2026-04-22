@@ -108,11 +108,15 @@ def resolve_from_root(root: Path, raw_path: str) -> Path:
     return (root / raw_path).resolve()
 
 
-def deployment_state_paths(root: Path) -> tuple[Path, ...]:
+def compose_project_name(root: Path) -> str:
+    return os.environ.get("COMPOSE_PROJECT_NAME", root.name)
+
+
+def deployment_state_volume_names(root: Path) -> tuple[str, ...]:
+    project_name = compose_project_name(root)
     return (
-        root / "db-data/data",
-        root / "garage-data/meta",
-        root / "garage-data/data",
+        f"{project_name}_db-data",
+        f"{project_name}_garage-data",
     )
 
 
@@ -146,35 +150,40 @@ def yaml_string(value: str) -> str:
 
 
 class BootstrapStateGuard:
-    ignored_filenames: ClassVar[set[str]] = {".gitkeep"}
-
-    def __init__(self, state_paths: tuple[Path, ...]):
-        self.state_paths = state_paths
+    def __init__(self, state_volume_names: tuple[str, ...]):
+        self.state_volume_names = state_volume_names
 
     def ensure_clean_state(self):
-        found_paths = [path for path in self.state_paths if self._contains_state(path)]
-        if not found_paths:
+        found_volumes = [
+            volume_name
+            for volume_name in self.state_volume_names
+            if self._exists(volume_name)
+        ]
+        if not found_volumes:
             return
 
-        joined_paths = ", ".join(str(path) for path in found_paths)
+        joined_volumes = ", ".join(found_volumes)
         raise RuntimeError(
-            "Existing persistent state detected in "
-            f"{joined_paths}. bootstrap-env.py now generates a fresh environment each time, "
-            "so rerunning it against an existing PostgreSQL or Garage data directory is unsafe. "
-            "Restore the previous .env/application.resolved.yml, or remove the persistent data "
-            "directories before bootstrapping a brand-new environment."
+            "Existing persistent state detected in Docker volumes "
+            f"{joined_volumes}. bootstrap-env.py now generates a fresh environment each time, "
+            "so rerunning it while those named volumes still exist is unsafe. "
+            "Restore the previous .env/application.resolved.yml, or remove the named volumes "
+            "before bootstrapping a brand-new environment."
         )
 
-    def _contains_state(self, path: Path) -> bool:
-        if not path.exists():
-            return False
-        if path.is_file():
-            return path.name not in self.ignored_filenames
+    def _exists(self, volume_name: str) -> bool:
+        try:
+            inspect_result = subprocess.run(
+                ["docker", "volume", "inspect", volume_name],
+                capture_output=True,
+                text=True,
+            )
+        except FileNotFoundError as error:
+            raise RuntimeError(
+                "docker is required to inspect named volumes before bootstrapping."
+            ) from error
 
-        for child in path.rglob("*"):
-            if child.is_file() and child.name not in self.ignored_filenames:
-                return True
-        return False
+        return inspect_result.returncode == 0
 
 
 AUTO_GENERATED_VALUE_BUILDERS: dict[str, Callable[[], str]] = {
@@ -363,7 +372,7 @@ def parse_args(deployment_root: Path) -> argparse.Namespace:
 def main():
     deployment_root = discover_deployment_root()
     options = parse_args(deployment_root)
-    state_guard = BootstrapStateGuard(deployment_state_paths(deployment_root))
+    state_guard = BootstrapStateGuard(deployment_state_volume_names(deployment_root))
     BootstrapEnvGenerator(
         env_template_path=options.env_template,
         env_output_path=options.env_output,
