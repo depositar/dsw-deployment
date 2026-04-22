@@ -19,7 +19,9 @@ DERIVED_VALUE_PLACEHOLDER = "<derived>"
 
 @dataclass(frozen=True)
 class EnvTemplate:
-    plain_value_pattern: ClassVar[re.Pattern[str]] = re.compile(r"[A-Za-z0-9_./:@+-]+")
+    plain_value_pattern: ClassVar[re.Pattern[str]] = re.compile(
+        r"[A-Za-z0-9_./:@+-]+"
+    )
 
     lines: list[str]
     assignments: dict[str, str]
@@ -30,7 +32,10 @@ class EnvTemplate:
             raise RuntimeError(f"Template file not found: {path}")
 
         lines = path.read_text().splitlines()
-        return cls(lines=lines, assignments=cls._parse_assignments(lines))
+        return cls(
+            lines=lines,
+            assignments=cls._parse_assignments(lines),
+        )
 
     @staticmethod
     def parse_literal(raw: str) -> str:
@@ -47,7 +52,11 @@ class EnvTemplate:
             return ""
         if cls.plain_value_pattern.fullmatch(value):
             return value
-        escaped = value.replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+        escaped = (
+            value.replace("\\", "\\\\")
+            .replace("\n", "\\n")
+            .replace('"', '\\"')
+        )
         return f'"{escaped}"'
 
     def render(self, resolved_values: Mapping[str, str]) -> str:
@@ -59,7 +68,9 @@ class EnvTemplate:
                 continue
 
             key, _ = line.split("=", 1)
-            rendered_lines.append(f"{key}={self.format_value(resolved_values[key])}")
+            rendered_lines.append(
+                f"{key}={self.format_value(resolved_values[key])}"
+            )
 
         return "\n".join(rendered_lines) + "\n"
 
@@ -90,11 +101,17 @@ def generate_rsa_private_key() -> str:
         )
     except FileNotFoundError as error:
         raise RuntimeError(
-            "openssl is required to generate the RSA private key for application.resolved.yml."
+            (
+                "openssl is required to generate the RSA private key for "
+                "application.resolved.yml."
+            )
         ) from error
     except subprocess.CalledProcessError as error:
         raise RuntimeError(
-            f"openssl failed to generate the RSA private key for application.resolved.yml: {error.stderr}"
+            (
+                "openssl failed to generate the RSA private key for "
+                f"application.resolved.yml: {error.stderr}"
+            )
         ) from error
 
     return result.stdout.strip()
@@ -120,10 +137,13 @@ def deployment_state_volume_names(root: Path) -> tuple[str, ...]:
     )
 
 
-def build_database_connection_string(resolved_values: Mapping[str, str]) -> str:
+def build_database_connection_string(
+    resolved_values: Mapping[str, str],
+) -> str:
     return (
         f"postgresql://{resolved_values['POSTGRES_USER']}:"
-        f"{resolved_values['POSTGRES_PASSWORD']}@{resolved_values['POSTGRES_HOST']}:"
+        f"{resolved_values['POSTGRES_PASSWORD']}"
+        f"@{resolved_values['POSTGRES_HOST']}:"
         f"{resolved_values['POSTGRES_PORT']}/"
         f"{resolved_values['POSTGRES_DB']}"
     )
@@ -165,9 +185,11 @@ class BootstrapStateGuard:
         joined_volumes = ", ".join(found_volumes)
         raise RuntimeError(
             "Existing persistent state detected in Docker volumes "
-            f"{joined_volumes}. bootstrap-env.py now generates a fresh environment each time, "
+            f"{joined_volumes}. bootstrap-env.py now generates a fresh "
+            "environment each time, "
             "so rerunning it while those named volumes still exist is unsafe. "
-            "Restore the previous .env/application.resolved.yml, or remove the named volumes "
+            "Restore the previous .env/application.resolved.yml, or remove "
+            "the named volumes "
             "before bootstrapping a brand-new environment."
         )
 
@@ -180,7 +202,8 @@ class BootstrapStateGuard:
             )
         except FileNotFoundError as error:
             raise RuntimeError(
-                "docker is required to inspect named volumes before bootstrapping."
+                "docker is required to inspect named volumes "
+                "before bootstrapping."
             ) from error
 
         return inspect_result.returncode == 0
@@ -202,9 +225,15 @@ DERIVED_VALUE_BUILDERS: dict[str, Callable[[Mapping[str, str]], str]] = {
 
 
 def resolve_base_env_value(key: str, parsed_value: str) -> str:
-    if key in AUTO_GENERATED_VALUE_BUILDERS and parsed_value in {"", AUTO_VALUE_PLACEHOLDER}:
+    if (
+        key in AUTO_GENERATED_VALUE_BUILDERS
+        and parsed_value in {"", AUTO_VALUE_PLACEHOLDER}
+    ):
         return AUTO_GENERATED_VALUE_BUILDERS[key]()
-    if key in DERIVED_VALUE_BUILDERS and parsed_value in {"", DERIVED_VALUE_PLACEHOLDER}:
+    if (
+        key in DERIVED_VALUE_BUILDERS
+        and parsed_value in {"", DERIVED_VALUE_PLACEHOLDER}
+    ):
         return ""
     return parsed_value
 
@@ -219,7 +248,10 @@ def resolve_base_env_values(template: EnvTemplate) -> dict[str, str]:
     return resolved_values
 
 
-def populate_derived_env_values(template: EnvTemplate, resolved_values: dict[str, str]):
+def populate_derived_env_values(
+    template: EnvTemplate,
+    resolved_values: dict[str, str],
+):
     for key, builder in DERIVED_VALUE_BUILDERS.items():
         if key in template.assignments and not resolved_values.get(key):
             resolved_values[key] = builder(resolved_values)
@@ -237,10 +269,14 @@ def validate_application_skeleton(path: Path):
 
     skeleton = path.read_text()
     required_sections = ("general:", "database:", "s3:", "mail:")
-    missing_sections = [section for section in required_sections if section not in skeleton]
+    missing_sections = [
+        section for section in required_sections if section not in skeleton
+    ]
     if missing_sections:
         raise RuntimeError(
-            f"Application skeleton {path} is missing required sections: {', '.join(missing_sections)}"
+            "Application skeleton "
+            f"{path} is missing required sections: "
+            f"{', '.join(missing_sections)}"
         )
 
 
@@ -260,7 +296,10 @@ def render_application_config(resolved_values: Mapping[str, str]) -> str:
         [
             "",
             "database:",
-            f"  connectionString: {yaml_string(resolved_values['DATABASE_CONNECTION_STRING'])}",
+            (
+                "  connectionString: "
+                f"{yaml_string(resolved_values['DATABASE_CONNECTION_STRING'])}"
+            ),
             "",
             "s3:",
             f"  url: {yaml_string(resolved_values['S3_URL'])}",
@@ -277,9 +316,18 @@ def render_application_config(resolved_values: Mapping[str, str]) -> str:
             "  smtp:",
             f"    host: {yaml_string(resolved_values['MAIL_SMTP_HOST'])}",
             f"    port: {smtp_port}",
-            f"    security: {yaml_string(resolved_values['MAIL_SMTP_SECURITY'])}",
-            f"    username: {yaml_string(resolved_values['MAIL_SMTP_USERNAME'])}",
-            f"    password: {yaml_string(resolved_values['MAIL_SMTP_PASSWORD'])}",
+            (
+                "    security: "
+                f"{yaml_string(resolved_values['MAIL_SMTP_SECURITY'])}"
+            ),
+            (
+                "    username: "
+                f"{yaml_string(resolved_values['MAIL_SMTP_USERNAME'])}"
+            ),
+            (
+                "    password: "
+                f"{yaml_string(resolved_values['MAIL_SMTP_PASSWORD'])}"
+            ),
         ]
     )
     return "\n".join(lines) + "\n"
@@ -309,7 +357,11 @@ class BootstrapEnvGenerator:
         validate_application_skeleton(self.application_skeleton_path)
         resolved_values = resolve_env_values(env_template)
 
-        self._write_output(self.env_output_path, env_template.render(resolved_values), 0o600)
+        self._write_output(
+            self.env_output_path,
+            env_template.render(resolved_values),
+            0o600,
+        )
         self._write_output(
             self.application_output_path,
             render_application_config(resolved_values),
@@ -321,7 +373,9 @@ class BootstrapEnvGenerator:
 
     def _write_output(self, path: Path, content: str, mode: int):
         if path.exists() and not self.force:
-            raise RuntimeError(f"{path} already exists. Use --force to overwrite it.")
+            raise RuntimeError(
+                f"{path} already exists. Use --force to overwrite it."
+            )
 
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
@@ -335,7 +389,10 @@ def parse_args(deployment_root: Path) -> argparse.Namespace:
         return resolve_from_root(deployment_root, raw_path)
 
     parser = argparse.ArgumentParser(
-        description="Generate .env and config/application.resolved.yml from template files."
+        description=(
+            "Generate .env and config/application.resolved.yml "
+            "from template files."
+        )
     )
     parser.add_argument(
         "--env-template",
@@ -358,13 +415,19 @@ def parse_args(deployment_root: Path) -> argparse.Namespace:
         "--application-template",
         type=resolve_path,
         default=resolve_path("config/application.yml"),
-        help="Path to the application.yml skeleton file used for structural validation.",
+        help=(
+            "Path to the application.yml skeleton file used for "
+            "structural validation."
+        ),
     )
     parser.add_argument(
         "--application-output",
         type=resolve_path,
         default=resolve_path("config/application.resolved.yml"),
-        help="Path to the generated runtime application.yml with resolved values.",
+        help=(
+            "Path to the generated runtime application.yml "
+            "with resolved values."
+        ),
     )
     return parser.parse_args()
 
@@ -372,7 +435,9 @@ def parse_args(deployment_root: Path) -> argparse.Namespace:
 def main():
     deployment_root = discover_deployment_root()
     options = parse_args(deployment_root)
-    state_guard = BootstrapStateGuard(deployment_state_volume_names(deployment_root))
+    state_guard = BootstrapStateGuard(
+        deployment_state_volume_names(deployment_root)
+    )
     BootstrapEnvGenerator(
         env_template_path=options.env_template,
         env_output_path=options.env_output,

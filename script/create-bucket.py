@@ -33,7 +33,9 @@ class BootstrapConfig:
     def _read_required_env(name: str) -> str:
         value = os.environ.get(name, "").strip()
         if not value:
-            raise GarageBootstrapError(f"{name} is required. Set it in .env or example.env.")
+            raise GarageBootstrapError(
+                f"{name} is required. Set it in .env or example.env."
+            )
         return value
 
     @staticmethod
@@ -41,7 +43,8 @@ class BootstrapConfig:
         match = re.fullmatch(r"(\d+)([KMGTP]?B?)?", raw.strip().upper())
         if not match:
             raise GarageBootstrapError(
-                "Unsupported GARAGE_CAPACITY value. Use a plain number or suffix like 1G, 500M, 10KB."
+                "Unsupported GARAGE_CAPACITY value. "
+                "Use a plain number or suffix like 1G, 500M, 10KB."
             )
 
         value = int(match.group(1))
@@ -65,10 +68,14 @@ class BootstrapConfig:
     @classmethod
     def from_env(cls) -> "BootstrapConfig":
         return cls(
-            garage_admin_url=cls._read_required_env("GARAGE_ADMIN_URL").rstrip("/"),
+            garage_admin_url=cls._read_required_env(
+                "GARAGE_ADMIN_URL"
+            ).rstrip("/"),
             garage_admin_token=cls._read_required_env("GARAGE_ADMIN_TOKEN"),
             garage_zone=cls._read_required_env("GARAGE_ZONE"),
-            garage_capacity=cls._parse_capacity(cls._read_required_env("GARAGE_CAPACITY")),
+            garage_capacity=cls._parse_capacity(
+                cls._read_required_env("GARAGE_CAPACITY")
+            ),
             garage_key_name=cls._read_required_env("GARAGE_KEY_NAME"),
             s3_url=cls._read_required_env("S3_URL").rstrip("/"),
             s3_bucket=cls._read_required_env("S3_BUCKET"),
@@ -90,7 +97,9 @@ class GarageAdminClient:
         status, body = self._request_json(method, path, payload)
         if 200 <= status < 300:
             return body
-        raise GarageBootstrapError(f"{method} {path} failed with {status}: {body}")
+        raise GarageBootstrapError(
+            f"{method} {path} failed with {status}: {body}"
+        )
 
     def get_optional(self, path: str):
         status, body = self._request_json("GET", path)
@@ -103,7 +112,10 @@ class GarageAdminClient:
     def wait_for_cluster(self, attempts: int = 60, delay_seconds: int = 1):
         for _ in range(attempts):
             try:
-                status, body = self._request_json("GET", "GetClusterStatus")
+                status, body = self._request_json(
+                    "GET",
+                    "GetClusterStatus",
+                )
             except urllib.error.URLError:
                 time.sleep(delay_seconds)
                 continue
@@ -113,20 +125,31 @@ class GarageAdminClient:
 
             time.sleep(delay_seconds)
 
-        raise GarageBootstrapError("Garage admin API did not become ready in time.")
+        raise GarageBootstrapError(
+            "Garage admin API did not become ready in time."
+        )
 
     def get_bucket(self, bucket_name: str):
         query = urllib.parse.quote(bucket_name)
         return self.get_optional(f"GetBucketInfo?globalAlias={query}")
 
     def create_bucket(self, bucket_name: str):
-        return self.request_required("POST", "CreateBucket", {"globalAlias": bucket_name})
+        return self.request_required(
+            "POST",
+            "CreateBucket",
+            {"globalAlias": bucket_name},
+        )
 
     def get_access_key(self, access_key_id: str):
         key_id = urllib.parse.quote(access_key_id)
         return self.get_optional(f"GetKeyInfo?id={key_id}&showSecretKey=true")
 
-    def import_access_key(self, access_key_id: str, secret_access_key: str, name: str):
+    def import_access_key(
+        self,
+        access_key_id: str,
+        secret_access_key: str,
+        name: str,
+    ):
         return self.request_required(
             "POST",
             "ImportKey",
@@ -144,19 +167,32 @@ class GarageAdminClient:
             {
                 "bucketId": bucket_id,
                 "accessKeyId": access_key_id,
-                "permissions": {"read": True, "write": True, "owner": True},
+                "permissions": {
+                    "read": True,
+                    "write": True,
+                    "owner": True,
+                },
             },
         )
 
     def _request_json(self, method: str, path: str, payload: Any = None):
         url = f"{self.base_url}/{path.lstrip('/')}"
         data = None if payload is None else json.dumps(payload).encode()
-        request = urllib.request.Request(url, data=data, headers=self.headers, method=method)
+        request = urllib.request.Request(
+            url,
+            data=data,
+            headers=self.headers,
+            method=method,
+        )
 
         try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+            with urllib.request.urlopen(
+                request,
+                timeout=self.timeout,
+            ) as response:
                 raw = response.read().decode()
-                return response.status, json.loads(raw) if raw and raw != "null" else None
+                parsed = json.loads(raw) if raw and raw != "null" else None
+                return response.status, parsed
         except urllib.error.HTTPError as error:
             raw = error.read().decode()
             try:
@@ -197,7 +233,9 @@ class GarageBootstrapper:
             self.client.request_required(
                 "POST",
                 "ApplyClusterLayout",
-                {"version": layout["version"] + 1},
+                {
+                    "version": layout["version"] + 1,
+                },
             )
 
     def ensure_bucket(self):
@@ -221,7 +259,8 @@ class GarageBootstrapper:
         if secret and secret != self.config.s3_password:
             raise GarageBootstrapError(
                 "Garage access key already exists with a different secret. "
-                "Update S3_PASSWORD or remove the existing key before retrying."
+                "Update S3_PASSWORD or remove the existing key "
+                "before retrying."
             )
 
         return access_key_id
