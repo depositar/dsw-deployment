@@ -1,5 +1,6 @@
-db-data/data
-s3-data/data
-garage-data/meta
-garage-data/data
+db-data/**
+s3-data/**
+garage-data/**
 .env
+config/application.resolved.yml
+**/__pycache__

@@ -11,14 +11,7 @@ services:
       create-bucket:
         condition: service_completed_successfully
     volumes:
-      - ./config/application.yml:/app/config/application.yml:ro
-    # Keep runtime S3 values in .env so they stay aligned with Garage bootstrap.
-    environment:
-      S3_URL: ${S3_URL}
-      S3_USERNAME: ${S3_USERNAME}
-      S3_PASSWORD: ${S3_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_REGION: ${S3_REGION}
+      - ./config/application.resolved.yml:/app/config/application.yml:ro
 
   client:
     image: datastewardshipwizard/wizard-client:${DSW_VERSION}
@@ -27,7 +20,7 @@ services:
     ports:
       - 127.0.0.1:8080:8080
     environment:
-      API_URL: http://localhost:3000/wizard-api
+      API_URL: ${CLIENT_API_URL}
 
   docworker:
     image: datastewardshipwizard/document-worker:${DSW_VERSION}
@@ -36,14 +29,7 @@ services:
       create-bucket:
         condition: service_completed_successfully
     volumes:
-      - ./config/application.yml:/app/config/application.yml:ro
-    # Keep runtime S3 values in .env so they stay aligned with Garage bootstrap.
-    environment:
-      S3_URL: ${S3_URL}
-      S3_USERNAME: ${S3_USERNAME}
-      S3_PASSWORD: ${S3_PASSWORD}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_REGION: ${S3_REGION}
+      - ./config/application.resolved.yml:/app/config/application.yml:ro
 
   mailer:
     image: datastewardshipwizard/mailer:${DSW_VERSION}
@@ -52,7 +38,7 @@ services:
       - postgres
       - server
     volumes:
-      - ./config/application.yml:/app/config/application.yml:ro
+      - ./config/application.resolved.yml:/app/config/application.yml:ro
 
   postgres:
     image: postgres:${POSTGRES_VERSION}
