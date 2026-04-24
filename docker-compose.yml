@@ -82,7 +82,7 @@ services:
     depends_on:
       garage:
         condition: service_started
-    command: ["/script/create-bucket.py"]
+    command: ["/scripts/create_bucket.py"]
     environment:
       GARAGE_ADMIN_URL: ${GARAGE_ADMIN_URL}
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN}
@@ -94,7 +94,7 @@ services:
       S3_USERNAME: ${S3_USERNAME}
       S3_PASSWORD: ${S3_PASSWORD}
     volumes:
-      - ./script/create-bucket.py:/script/create-bucket.py:ro
+      - ./scripts/create_bucket.py:/scripts/create_bucket.py:ro
 
 volumes:
   db-data:

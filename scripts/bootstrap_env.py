@@ -185,7 +185,7 @@ class BootstrapStateGuard:
         joined_volumes = ", ".join(found_volumes)
         raise RuntimeError(
             "Existing persistent state detected in Docker volumes "
-            f"{joined_volumes}. bootstrap-env.py now generates a fresh "
+            f"{joined_volumes}. bootstrap_env.py now generates a fresh "
             "environment each time, "
             "so rerunning it while those named volumes still exist is unsafe. "
             "Restore the previous .env/application.resolved.yml, or remove "

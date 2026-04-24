@@ -1,0 +1,37 @@
+name: Python Lint and Test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python-checks:
+    name: Lint and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Create virtual environment
+        run: python -m venv .venv
+
+      - name: Install test dependencies
+        run: .venv/bin/pip install flake8 pytest pytest-cov
+
+      - name: Run flake8
+        run: .venv/bin/flake8 scripts tests
+
+      - name: Run pytest with coverage
+        run: .venv/bin/pytest --cov=scripts --cov-report=term-missing --cov-report=xml tests
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
