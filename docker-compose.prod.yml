@@ -1,0 +1,46 @@
+services:
+
+  server:
+    networks:
+      web_proxy:
+        aliases:
+          - dsw-server
+      dsw_internal:
+
+  client:
+    networks:
+      web_proxy:
+        aliases:
+          - dsw-client
+      dsw_internal:
+
+  docworker:
+    networks:
+      - web_proxy
+      - dsw_internal
+
+  mailer:
+    networks:
+      - web_proxy
+      - dsw_internal
+
+  postgres:
+    networks:
+      - dsw_internal
+
+  garage:
+    networks:
+      web_proxy:
+        aliases:
+          - dsw-garage
+      dsw_internal:
+
+  create-bucket:
+    networks:
+      - web_proxy
+      - dsw_internal
+
+networks:
+  web_proxy:
+    external: true
+  dsw_internal:
