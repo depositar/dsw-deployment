@@ -8,6 +8,10 @@ services:
     ports:
       - 127.0.0.1:3000:3000
     depends_on:
+      postgres:
+        condition: service_started
+      garage:
+        condition: service_started
       create-bucket:
         condition: service_completed_successfully
     volumes:
@@ -26,6 +30,12 @@ services:
     image: datastewardshipwizard/document-worker:${DSW_VERSION}
     restart: always
     depends_on:
+      postgres:
+        condition: service_started
+      garage:
+        condition: service_started
+      server:
+        condition: service_started
       create-bucket:
         condition: service_completed_successfully
     volumes:
@@ -67,12 +77,12 @@ services:
       - garage-data:/var/lib/garage
 
   create-bucket:
-    image: python:3.13-alpine
+    image: gcr.io/distroless/python3:nonroot
     restart: "no"
     depends_on:
       garage:
         condition: service_started
-    entrypoint: ["python3", "/script/create-bucket.py"]
+    command: ["/script/create-bucket.py"]
     environment:
       GARAGE_ADMIN_URL: ${GARAGE_ADMIN_URL}
       GARAGE_ADMIN_TOKEN: ${GARAGE_ADMIN_TOKEN}

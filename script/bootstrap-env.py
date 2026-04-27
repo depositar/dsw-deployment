@@ -224,6 +224,10 @@ DERIVED_VALUE_BUILDERS: dict[str, Callable[[Mapping[str, str]], str]] = {
 }
 
 
+# Derived values are computed in a second pass
+# after all base values are resolved.
+# Return empty string as a sentinel for
+# populate_derived_env_values() to fill in.
 def resolve_base_env_value(key: str, parsed_value: str) -> str:
     if (
         key in AUTO_GENERATED_VALUE_BUILDERS
