@@ -1,44 +1,55 @@
-# DSW Deployment Example
-
-## :exclamation: Important
-
-If you use or plan to use DSW, please let us know via [info@ds-wizard.org](mailto:info@ds-wizard.org) to:
-
-- Join our [**Discord** server](https://discord.gg/MW3H9tdMcT), where you can be notified about important updates and releases + we can discuss your issues and ideas.
-- Provide us feedback (what is good and bad, [feature requests](https://ideas.ds-wizard.org/), etc.)
-
-This example is intended for **local setup and testing**. For production use there are many more things to do such as authentication, controlling exposed ports (e.g. do not expose ports of `postgres` and `garage`), data backups, or using proxy (with HTTPS and WebSocket enabled). As it is highly dependent on your use case, consult production deployment with your sysadmin or [contact us](https://ds-wizard.org/contact).
+# Production Deployment of depositar DSW
 
 ## Overview
 
-This is an example deployment of the [Data Stewardship Wizard](https://ds-wizard.org) using [Docker Compose](https://docs.docker.com/compose/) and [Garage](https://garagehq.deuxfleurs.fr/) as the S3-compatible object storage.
+This branch is based on [dsw-deployment-example](https://github.com/ds-wizard/dsw-deployment-example), modified for production use.
 
-It is intentionally set up as a **single-node local POC**:
+The following list shows the features that have (or have not) been modified:
+   - [x] Delete port forwarding of garage and postgresql.
+   - [x] Use named volumes for PostgreSQL and Garage persistent data.
+   - [x] Add bootstrap scripts for generating keys and accounts.
+   - [x] Add a one-off service in docker-compose.yml to create the bucket.
+   - [x] Check lint and generate test coverage in CI runner.
+   - [ ] A reverse proxy with automatic TLS.
+   - [ ] An SMTP server with DMARC, DKIM, and SPF support.
 
-- Garage runs in Docker on host ports `9000` (S3 API) and `9003` (Admin API)
-- DSW points to `http://host.docker.internal:9000` so presigned URLs are reachable from the browser
-- `create-bucket.sh` performs the one-time Garage bootstrap for this example
-
-For information on how to use Data Stewardship Wizard, visit our [guide](https://guide.ds-wizard.org).
 
 ## Quick Start
 
-1. Create the local environment file:
+1. Install prerequisites:
+
+   Requirements:
+
+   - Python 3.7+
+   - OpenSSL
+   - Docker CE with Docker Compose V2
+
+   Verify their availability:
 
    ```bash
-   cp example.env .env
+   python3 --version
+   openssl version
+   docker compose version
    ```
 
-2. Start the stack:
+   To run lint, tests, and pre-commit hooks locally,
+   install the required packages in a virtual environment:
 
    ```bash
-   docker compose up -d
+   python3 -m venv .venv
+   ./.venv/bin/pip install flake8 pytest pytest-cov pre-commit
    ```
 
-3. Bootstrap Garage:
+2. Generate the local environment files (`.env` and `config/application.resolved.yml`):
 
    ```bash
-   ./create-bucket.sh
+   ./scripts/bootstrap_env.py
+   ```
+
+3. Start the stack:
+
+   ```bash
+   docker compose --env-file .env up -d
    ```
 
 4. Open DSW:
@@ -52,12 +63,20 @@ For information on how to use Data Stewardship Wizard, visit our [guide](https:/
 
 ## What The Bootstrap Does
 
-`create-bucket.sh` is intended to be safe to rerun for this local setup. It:
+This setup has two bootstrap stages:
 
-- assigns the single-node Garage layout if the node still has no role
-- creates the configured S3 bucket if it does not exist
-- imports the configured Garage access key if it does not exist
-- grants read, write, and owner permissions on the bucket to that key
+- `./scripts/bootstrap_env.py` generates `.env` and `config/application.resolved.yml`
+  from `example.env` and `config/application.yml`, respectively. It generates passwords and
+  secret values that are left for automatic creation, builds values that depend
+  on other settings such as `DATABASE_CONNECTION_STRING`, and generates the RSA
+  private key for the DSW application.
+
+- `create_bucket.py` runs automatically as the `create-bucket` Docker Compose
+  service during startup. It is intended to be safe to rerun for this local
+  setup. It assigns the single-node Garage layout if the node still has no
+  role, creates the configured S3 bucket if it does not exist, imports the
+  configured Garage access key if it does not exist, and grants read, write,
+  and owner permissions on the bucket to that key.
 
 ## Verification Checklist
 
@@ -89,17 +108,7 @@ In the DSW UI, verify:
 4. a document preview can be generated
 5. a document template asset URL works, if applicable
 
-If these checks pass, Garage is functioning as a drop-in S3-compatible backend for this example deployment.
-
-## Important Notes
-
-* Use `docker compose pull` to get newest image (hotfixes) before starting
-* **Do not expose** PostgreSQL and Garage to the internet in a public deployment (Garage should be behind your proxy, firewall, or private network setup)
-* When you want to use DSW publicly, **set up HTTPS proxy** (e.g. Nginx) with a certificate for your domain and change default accounts
-* Set up volume mounted to PostgreSQL and Garage containers for persistent data
-* Garage needs a one-time bootstrap after the stack starts. `create-bucket.sh` assigns the single-node layout, creates the bucket, imports the configured S3 key, and grants bucket permissions
-* DSW uses `http://host.docker.internal:9000` as the S3 endpoint so both the DSW containers and the browser can reach the same local Garage endpoint
-* Always use **strong passwords** and never use default values, **change the secrets** in `config/application.yml` and `.env` (JWT secret, RSA private key, Garage RPC/admin tokens, and S3 credentials)
+If these checks pass, Garage is functioning as a drop-in S3-compatible backend for this deployment.
 
 ## Troubleshooting
 
@@ -112,13 +121,34 @@ docker compose logs server --tail=200
 docker compose logs docworker --tail=200
 ```
 
-Common local issues:
+## Development Checks
 
-- Garage was started, but `create-bucket.sh` was not run yet
-- `.env` values and the imported Garage key no longer match
-- the server is still starting and has not reached a healthy state yet
-- an old local data directory contains stale state from a previous attempt
+Run the following commands from the repository root after creating `.venv` and
+installing the development tools:
 
-## Security Audit
+### Unit Tests
 
-This repository is used to regularly check vulnerabilities in the latest release of Docker images. [Grype](https://github.com/anchore/grype) tool is used (see [security-audit.yml](.github/workflows/security-audit.yml) file and related GitHub Actions runs). Once a vulnerability is detected, we are notified and start working on a new hotfix version. You should **always use the latest version** you can find used in this repository.
+```bash
+./.venv/bin/pytest tests
+```
+
+### Lint
+
+```bash
+./.venv/bin/flake8 scripts tests
+```
+
+### Pre-commit Check
+
+Run all configured hooks across the repository:
+
+```bash
+./.venv/bin/pre-commit run --all-files
+```
+
+Set up the Git hook once to run checks automatically before
+each commit:
+
+```bash
+./.venv/bin/pre-commit install
+```
