@@ -40,6 +40,14 @@ services:
       - web_proxy
       - dsw_internal
 
+  static:
+    build: static/
+    restart: always
+    networks:
+      web_proxy:
+        aliases:
+          - dsw-static
+
 networks:
   web_proxy:
     external: true
